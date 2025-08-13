@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>점심 메뉴 룰렛</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nanum+Square+Neo:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1220;
+      --panel: #181c2f;
+      --text: #eef1ff;
+      --accent: #6c7bff;
+      --accent-2: #ff7ab6;
+      --good: #2ee6a6;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box }
+    html, body { height: 100% }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 700px at 70% -10%, #1b2141 10%, var(--bg) 60%) no-repeat, var(--bg);
+      color: var(--text);
+      font-family: "Nanum Square Neo", system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+    .app {
+      width: min(92vw, 720px);
+      background: linear-gradient(180deg, #1a1f34, #121629);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: clamp(14px, 3.5vmin, 26px);
+      position: relative;
+      overflow: hidden;
+    }
+    .title { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .2px; margin: 2px 2px 14px; }
+    .title .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: conic-gradient(from 0deg, #6c7bff, #2ee6a6, #ff7ab6, #ffd36a, #6c7bff);
+      box-shadow: 0 0 10px #6c7bff80, 0 0 20px #2ee6a680, 0 0 30px #ff7ab680;
+    }
+    .wrap { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: center; justify-items: center; }
+    .wheel-wrap { position: relative; display: grid; place-items: center; }
+    canvas#wheel {
+      width: min(80vmin, 520px);
+      height: min(80vmin, 520px);
+      background: radial-gradient(circle at 50% 45%, #1f2544 0%, #121629 70%);
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: inset 0 0 50px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.45);
+      display: block;
+    }
+    .pointer::after{
+  content:"";
+  position:absolute; left:50%; top:-2px; transform:translateX(-50%);
+  width:0; height:0;
+  border-left:16px solid transparent;
+  border-right:16px solid transparent;
+  border-top:28px solid #fff;         
+  border-top-color: rgb(255, 255, 0);  /* 안쪽 밝은 색 */
+  filter: drop-shadow(0 0 0 transparent);
+}
+    .btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    button {
+      cursor: pointer; border: none; padding: 12px 18px; border-radius: 12px;
+      font-weight: 700; color: #0b0e1b;
+      background: linear-gradient(180deg, #aab1ff, #6c7bff);
+      box-shadow: 0 8px 18px rgba(108,123,255,.35);
+      transition: transform .08s ease, filter .08s ease;
+    }
+    button:hover { filter: brightness(1.05) }
+    button:active { transform: translateY(1px) }
+    button.secondary { background: linear-gradient(180deg, #ffd6ea, #ff7ab6); box-shadow: 0 8px 18px rgba(255,122,182,.35); }
+    .result {
+      margin-top: 6px; padding: 12px 14px; background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08); border-radius: 12px; text-align: center;
+      font-weight: 700; letter-spacing: .2px; display: none;
+    }
+    .result.show { display: block }
+    .tag { display: inline-block; padding: 3px 8px; border-radius: 999px; background: rgba(108,123,255,.2); color: #cfd4ff; font-size: 12px; font-weight: 800; margin-right: 8px; vertical-align: middle; }
+    .confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+    .piece {
+      position: absolute; width: 10px; height: 16px; opacity: .95; top: -20px;
+      transform: translate3d(0,-40px,0) rotate(0deg); will-change: transform, opacity;
+      animation: fall 1200ms ease-out forwards;
+    }
+    @keyframes fall {
+      0%   { transform: translate3d(var(--x,0px), -40px, 0) rotate(0deg) }
+      60%  { transform: translate3d(calc(var(--x,0px) + var(--tx,0px)), 60vh, 0) rotate(220deg) }
+      100% { transform: translate3d(calc(var(--x,0px) + var(--tx,0px)), 100vh, 0) rotate(360deg); opacity: 0.4 }
+    }
+    .legend { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; width: 100%; margin-top: 4px; opacity: .9; font-size: 13px; }
+    .chip { display: flex; align-items: center; gap: 8px; }
+    .sw { width: 14px; height: 14px; border-radius: 3px; flex: 0 0 14px; border: 1px solid rgba(255,255,255,.25)}
+    .muted { opacity: .7; font-weight: 600; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="title">
+      <div class="dot"></div>
+      <div>점심 메뉴 룰렛</div>
+    </div>
+
+    <div class="wrap">
+      <div class="wheel-wrap">
+        <div class="pointer" aria-hidden="true"></div>
+        <canvas id="wheel"></canvas>
+        <div class="confetti" id="confetti"></div>
+      </div>
+
+      <div class="btns">
+        <button id="spinBtn">돌리기 🎯</button>
+        <button id="shuffleBtn" class="secondary" title="섞기(순서만)">섞기 🔀</button>
+      </div>
+
+      <div id="result" class="result" role="status" aria-live="polite"></div>
+
+      <div class="legend" id="legend"></div>
+      <div class="muted">TIP: <b>items</b> 배열에 가게를 추가/수정하면 됩니다. 이미지 쓰려면 <code>img</code>에 URL을 넣으세요.</div>
+    </div>
+  </div>
+
+  <script>
+    // ====== 식당 리스트 =======================================================
+    const items = [
+      { label: "해중천", img: null },
+      { label: "감빠문", img: null },
+      { label: "라이스 샌드위치", img: null },
+      { label: "뜸들이다", img: null },
+      { label: "미야니치 라멘", img: null },
+      { label: "소고기 국밥", img: null },
+      { label: "찌개집", img: null },
+      { label: "맥도날드", img: null },
+      { label: "초가집", img: null },
+      { label: "수백당", img: null },
+      { label: "밀밭", img: null },
+      { label: "그린퍼즐", img: null },
+      { label: "해룡마을 국수", img: null },
+{ label: "윽 물고기", img: null },
+{ label: "국수나무", img: null },
+{ label: "사또통족발", img: null },
+{ label: "브라운 돈가스", img: null },
+    ];
+    // ========================================================================
+
+    const canvas = document.getElementById('wheel');
+    const ctx = canvas.getContext('2d');
+    const spinBtn = document.getElementById('spinBtn');
+    const shuffleBtn = document.getElementById('shuffleBtn');
+    const resultBox = document.getElementById('result');
+    const legendBox = document.getElementById('legend');
+    const confettiBox = document.getElementById('confetti');
+
+    let DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1.25));
+    let sizeCSS = Math.min(window.innerWidth * 0.9, 520);
+
+    const TAU = Math.PI * 2;
+    const POINTER_ANGLE = -Math.PI / 2; // 12시 포인터
+
+    function resizeCanvas() {
+      const cssSize = Math.min(Math.min(window.innerWidth * 0.9, 520), window.innerHeight * 0.6);
+      sizeCSS = Math.max(320, cssSize);
+      canvas.style.width = canvas.style.height = sizeCSS + 'px';
+      canvas.width = Math.floor(sizeCSS * DPR);
+      canvas.height = Math.floor(sizeCSS * DPR);
+      drawWheel();
+    }
+    window.addEventListener('resize', resizeCanvas, { passive: true });
+
+    let currentAngle = 0; // 회전 각도(라디안)
+    let spinning = false;
+
+    const palette = (n) => Array.from({length:n}, (_,i)=>`hsl(${Math.round((360/n)*i)}, 75%, 55%)`);
+    const strokeColors = (n) => Array.from({length:n}, (_,i)=>`hsl(${Math.round((360/n)*i)}, 70%, 38%)`);
+
+    // 이미지 프리로드
+    const images = items.map(it => {
+      if (!it.img) return null;
+      const im = new Image();
+      im.crossOrigin = 'anonymous';
+      im.src = it.img;
+      return im;
+    });
+
+    function drawWheel() {
+      const n = items.length;
+      const cols = palette(n);
+      const borderCols = strokeColors(n);
+      const r = (Math.min(canvas.width, canvas.height)/2) - 20*DPR;
+      const cx = canvas.width/2, cy = canvas.height/2;
+
+      ctx.save();
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+
+      ctx.translate(cx, cy);
+      ctx.rotate(currentAngle + POINTER_ANGLE); // 포인터가 12시에 오도록 보정
+
+      const slice = TAU / n;
+
+      for (let i=0; i<n; i++) {
+        const start = i * slice;
+        const end = start + slice;
+
+        // 조각
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.arc(0,0,r,start,end);
+        ctx.closePath();
+        const grad = ctx.createRadialGradient(0,0, r*0.2, 0,0, r);
+        grad.addColorStop(0, 'rgba(255,255,255,.06)');
+        grad.addColorStop(1, cols[i]);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // 테두리
+        ctx.lineWidth = Math.max(2, 3*DPR);
+        ctx.strokeStyle = borderCols[i];
+        ctx.stroke();
+
+        // 텍스트
+        const mid = (start + end)/2;
+        ctx.save();
+        ctx.rotate(mid);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const fontSize = Math.max(16*DPR, Math.min(28*DPR, r*0.095));
+        ctx.font = `700 ${fontSize}px "Nanum Square Neo", "Noto Sans KR", system-ui`;
+        ctx.shadowColor = 'rgba(0,0,0,.35)';
+        ctx.shadowBlur = 8*DPR;
+        ctx.fillStyle = '#fff';
+        let text = items[i].label;
+        const maxChars = 10;
+        if (text.length > maxChars) text = text.slice(0, maxChars-1) + '…';
+        ctx.fillText(text, r*0.62, 0);
+        ctx.restore();
+
+        // 이미지(선택)
+        if (images[i] && images[i].complete) {
+          ctx.save();
+          ctx.rotate(mid);
+          const imgSize = Math.min(56*DPR, r*0.18);
+          ctx.beginPath();
+          ctx.arc(r*0.82, 0, imgSize/2, 0, TAU);
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(images[i], r*0.82 - imgSize/2, -imgSize/2, imgSize, imgSize);
+          ctx.restore();
+        }
+      }
+
+      ctx.rotate(-currentAngle - POINTER_ANGLE);
+      ctx.restore();
+
+      // 가운데 캡
+      ctx.save();
+      ctx.translate(cx,cy);
+      const capR = Math.max(40*DPR, Math.min(68*DPR, r*0.18));
+      const capGrad = ctx.createRadialGradient(-capR*0.3, -capR*0.3, capR*0.1, 0,0, capR);
+      capGrad.addColorStop(0, '#ffffffdd');
+      capGrad.addColorStop(0.2, '#b2baffbb');
+      capGrad.addColorStop(1, '#5b67ff');
+      ctx.fillStyle = capGrad;
+      ctx.beginPath(); ctx.arc(0,0,capR,0,TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 3*DPR; ctx.stroke();
+      ctx.restore();
+    }
+
+    function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3) }
+
+    // 포인터 아래의 인덱스 계산(그려진 것과 100% 일치)
+    function indexAtPointer(angle){
+      const n = items.length;
+      const slice = TAU / n;
+      // 포인터는 12시이므로 유효 각도는 -angle
+      const phi = ((-angle % TAU) + TAU) % TAU; // 0..TAU
+      return Math.floor(phi / slice) % n;
+    }
+
+    function spin() {
+      if (spinning) return;
+      spinning = true;
+      spinBtn.disabled = true; shuffleBtn.disabled = true;
+      resultBox.classList.remove('show');
+
+      const start = currentAngle;
+      const spins = 6 + Math.floor(Math.random() * 3); // 6~8바퀴
+      const rnd = Math.random() * TAU;                 // 0~360º 랜덤(균등 확률)
+      const end = start + spins * TAU + rnd;
+
+      const duration = 4200 + Math.random()*900; // 4.2~5.1s
+      const t0 = performance.now();
+
+      function frame(now) {
+        const t = Math.min(1, (now - t0) / duration);
+        const eased = easeOutCubic(t);
+        currentAngle = start + (end - start) * eased;
+        drawWheel();
+
+        if (t < 1) {
+          requestAnimationFrame(frame);
+        } else {
+          currentAngle = end % TAU;
+          drawWheel();
+          const idx = indexAtPointer(currentAngle);
+          reveal(idx);
+          spinning = false;
+          spinBtn.disabled = false; shuffleBtn.disabled = false;
+          try { navigator.vibrate && navigator.vibrate(35); } catch(e){}
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+
+    function reveal(idx) {
+      const name = items[idx].label;
+      resultBox.innerHTML = `<span class="tag">결과</span> 오늘의 점심은 <b style="color: var(--good)">${name}</b> 🎉`;
+      resultBox.classList.add('show');
+      burstConfetti();
+    }
+
+    function burstConfetti() {
+      const colors = ['#6c7bff','#2ee6a6','#ff7ab6','#ffd36a','#67e8f9'];
+      const count = 80;
+      for (let i=0;i<count;i++) {
+        const el = document.createElement('div');
+        el.className = 'piece';
+        el.style.left = (Math.random()*100) + '%';
+        el.style.setProperty('--x', (Math.random()*300 - 150) + 'px');
+        el.style.setProperty('--tx', (Math.random()*160 - 80) + 'px');
+        el.style.background = colors[i % colors.length];
+        el.style.transform = `translate3d(0,-40px,0) rotate(${Math.random()*360}deg)`;
+        el.style.borderRadius = Math.random() > .5 ? '2px' : '50%';
+        el.style.width = (8 + Math.random()*8) + 'px';
+        el.style.height = (12 + Math.random()*14) + 'px';
+        confettiBox.appendChild(el);
+        setTimeout(()=> el.remove(), 1500 + Math.random()*800);
+      }
+    }
+
+    function shuffle() {
+      for (let i = items.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [items[i], items[j]] = [items[j], items[i]];
+        [images[i], images[j]] = [images[j], images[i]];
+      }
+      currentAngle = (currentAngle + (Math.random() * (Math.PI/6))) % TAU;
+      buildLegend();
+      drawWheel();
+      resultBox.classList.remove('show');
+    }
+
+    function buildLegend() {
+      legendBox.innerHTML = '';
+      const cols = palette(items.length);
+      items.forEach((it, i) => {
+        const d = document.createElement('div');
+        d.className = 'chip';
+        d.innerHTML = `<span class="sw" style="background:${cols[i]}"></span><span>${it.label}</span>`;
+        legendBox.appendChild(d);
+      });
+    }
+
+    document.getElementById('spinBtn').addEventListener('click', spin);
+    document.getElementById('shuffleBtn').addEventListener('click', shuffle);
+    document.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') spin(); });
+
+    resizeCanvas();
+    buildLegend();
+    drawWheel();
+  </script>
+</body>
+</html>
